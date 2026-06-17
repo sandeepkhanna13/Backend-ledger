@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Backend Ledger - Dashboard</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="dashboard-body">
+    <!-- Navbar -->
+    <nav class="navbar custom-navbar">
+      <div class="container-fluid px-4">
+        <div class="navbar-brand">
+          <span class="logo-icon-sm">₹</span>
+          Backend Ledger
+        </div>
+        <div class="d-flex align-items-center gap-3">
+          <span class="user-greeting" id="userGreeting">Hello, User</span>
+          <button class="btn btn-outline-light btn-sm" onclick="logout()">
+            Logout
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container py-4">
+      <!-- Stats Row -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="stat-card">
+            <div class="stat-label">Total Accounts</div>
+            <div class="stat-value" id="totalAccounts">0</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="stat-card highlight">
+            <div class="stat-label">Total Balance</div>
+            <div class="stat-value" id="totalBalance">₹0</div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="stat-card">
+            <div class="stat-label">Currency</div>
+            <div class="stat-value">INR</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accounts Section -->
+      <div class="section-card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="section-title">Your Accounts</h5>
+          <button
+            class="btn custom-btn-sm"
+            onclick="window.location.href = 'create-account.html'"
+          >
+            + New Account
+          </button>
+        </div>
+        <div id="accountsList">
+          <div class="text-center py-4 text-muted">Loading accounts...</div>
+        </div>
+      </div>
+
+      <!-- Transfer Section -->
+      <div class="section-card">
+        <h5 class="section-title mb-3">Transfer Money</h5>
+        <form id="transferForm">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">From Account</label>
+              <select
+                class="form-select custom-input"
+                id="fromAccount"
+                required
+              >
+                <option value="">Select account...</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">To Account ID</label>
+              <input
+                type="text"
+                class="form-control custom-input"
+                id="toAccount"
+                placeholder="Enter account ID"
+                required
+              />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Amount (₹)</label>
+              <input
+                type="number"
+                class="form-control custom-input"
+                id="amount"
+                placeholder="1000"
+                required
+              />
+            </div>
+          </div>
+          <button type="submit" class="btn custom-btn mt-3">Send Money</button>
+          <div id="transferMsg" class="alert mt-3 d-none"></div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      const API = "http://localhost:3000";
+      const token = localStorage.getItem("token");
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+      if (!token) window.location.href = "login.html";
+
+      document.getElementById("userGreeting").textContent =
+        `Hello, ${user.name || "User"}`;
+
+      async function loadAccounts() {
+        try {
+          const res = await fetch(`${API}/api/accounts/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          const accounts = data.accounts || [];
+
+          document.getElementById("totalAccounts").textContent =
+            accounts.length;
+
+          const fromSelect = document.getElementById("fromAccount");
+          fromSelect.innerHTML = '<option value="">Select account...</option>';
+
+          let totalBalance = 0;
+          let html = "";
+
+          for (const acc of accounts) {
+            // Get balance for each account
+            const balRes = await fetch(
+              `${API}/api/accounts/balance/${acc._id}`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              },
+            );
+            const balData = await balRes.json();
+            const balance = balData.balance || 0;
+            totalBalance += balance;
+
+            html += `
+                        <div class="account-card">
+                            <div class="account-info">
+                                <div class="account-id">Account ID: <span>${acc._id}</span></div>
+                                <div class="account-status ${acc.status === "ACTIVE" ? "active" : ""}">${acc.status}</div>
+                            </div>
+                            <div class="account-balance">₹${balance.toLocaleString()}</div>
+                        </div>
+                    `;
+
+            fromSelect.innerHTML += `<option value="${acc._id}">Account ...${acc._id.slice(-6)} (₹${balance})</option>`;
+          }
+
+          document.getElementById("totalBalance").textContent =
+            `₹${totalBalance.toLocaleString()}`;
+          document.getElementById("accountsList").innerHTML =
+            html ||
+            '<div class="text-center py-4 text-muted">No accounts found. Create one!</div>';
+        } catch (err) {
+          document.getElementById("accountsList").innerHTML =
+            '<div class="text-center py-4 text-danger">Error loading accounts.</div>';
+        }
+      }
+
+      document
+        .getElementById("transferForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const fromAccount = document.getElementById("fromAccount").value;
+          const toAccount = document.getElementById("toAccount").value;
+          const amount = document.getElementById("amount").value;
+          const transferMsg = document.getElementById("transferMsg");
+          const idempotencyKey = `txn-${Date.now()}`;
+
+          try {
+            const res = await fetch(`${API}/api/transactions/`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                fromAccount,
+                toAccount,
+                amount: Number(amount),
+                idempotencyKey,
+              }),
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+              transferMsg.className = "alert alert-danger mt-3";
+              transferMsg.textContent = data.message || "Transaction failed!";
+            } else {
+              transferMsg.className = "alert alert-success mt-3";
+              transferMsg.textContent = `✅ Transaction successful! ₹${amount} sent.`;
+              loadAccounts();
+            }
+            transferMsg.classList.remove("d-none");
+          } catch (err) {
+            transferMsg.className = "alert alert-danger mt-3";
+            transferMsg.textContent = "Server error. Please try again.";
+            transferMsg.classList.remove("d-none");
+          }
+        });
+
+      function logout() {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        window.location.href = "login.html";
+      }
+
+      loadAccounts();
+    </script>
+  </body>
+</html>

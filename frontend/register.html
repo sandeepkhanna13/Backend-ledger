@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backend Ledger - Register</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-body">
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <div class="logo-icon">₹</div>
+                <h1>Create Account</h1>
+                <p>Join Backend Ledger Today</p>
+            </div>
+            <form id="registerForm">
+                <div class="mb-3">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" class="form-control custom-input" id="name" placeholder="John Doe" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" class="form-control custom-input" id="email" placeholder="you@example.com" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control custom-input" id="password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 custom-btn">Create Account</button>
+                <div id="errorMsg" class="alert alert-danger mt-3 d-none"></div>
+                <div id="successMsg" class="alert alert-success mt-3 d-none"></div>
+            </form>
+            <div class="auth-footer">
+                Already have an account? <a href="login.html">Login here</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:3000';
+
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const errorMsg = document.getElementById('errorMsg');
+            const successMsg = document.getElementById('successMsg');
+
+            try {
+                const res = await fetch(`${API}/api/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    errorMsg.textContent = data.message || 'Registration failed!';
+                    errorMsg.classList.remove('d-none');
+                    successMsg.classList.add('d-none');
+                    return;
+                }
+
+                successMsg.textContent = 'Account created successfully! Redirecting to login...';
+                successMsg.classList.remove('d-none');
+                errorMsg.classList.add('d-none');
+                setTimeout(() => window.location.href = 'login.html', 2000);
+            } catch (err) {
+                errorMsg.textContent = 'Server error. Please try again.';
+                errorMsg.classList.remove('d-none');
+            }
+        });
+    </script>
+</body>
+</html>
