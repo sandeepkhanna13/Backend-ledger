@@ -6,7 +6,16 @@ const app = express();
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({ origin: "*" }));
+
+// Configured CORS globally to allow seamless cross-origin requests from your upcoming live frontend
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
+
 app.use(express.urlencoded({ extended: true }));
 
 /**
